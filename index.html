@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SứcKhỏe AI – Phân tích triệu chứng & tìm nhà thuốc gần bạn</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="top">
+  <div class="wrap">
+    <h1>🩺 SứcKhỏe AI</h1>
+    <p>Phân tích triệu chứng · gợi ý nhóm thuốc · tìm cơ sở y tế trong bán kính 10 km</p>
+  </div>
+</header>
+
+<div class="disclaimer" role="note">
+  <strong>⚠️ Lưu ý quan trọng:</strong> Ứng dụng chỉ cung cấp thông tin tham khảo, <u>không phải chẩn đoán y khoa</u> và không thay thế bác sĩ.
+  Không tự dùng kháng sinh. Nếu có dấu hiệu nguy hiểm hãy gọi <a href="tel:115"><strong>115</strong></a> ngay.
+</div>
+
+<main class="wrap">
+  <form id="form" autocomplete="off">
+    <section class="card">
+      <h2>1. Thông tin của bạn</h2>
+      <div class="grid">
+        <label class="full">Họ và tên <input type="text" id="fullname" autocomplete="name" placeholder="vd: Nguyễn Văn A"></label>
+        <label>Ngày tháng năm sinh <input type="date" id="dob" autocomplete="bday"></label>
+        <label class="full">Nơi ở hiện tại <input type="text" id="address" autocomplete="street-address" placeholder="Số nhà, đường, phường/xã, quận/huyện, tỉnh/thành"></label>
+      </div>
+      <div class="row">
+        <button type="button" id="btnGeocode" class="btn secondary">Xác định theo địa chỉ</button>
+        <button type="button" id="btnLocate" class="btn secondary">📍 Dùng vị trí GPS</button>
+      </div>
+      <p id="locStatus" class="muted">Địa chỉ/vị trí chỉ dùng để tìm nơi khám trong 10 km, không được lưu lại.</p>
+    </section>
+
+    <section class="card" id="redflags">
+      <h2>2. Dấu hiệu nguy hiểm</h2>
+      <p class="muted">Bạn có dấu hiệu nào dưới đây không?</p>
+      <div id="rfList" class="checks"></div>
+    </section>
+
+    <section class="card">
+      <h2>3. Tình trạng hiện tại</h2>
+      <div class="grid">
+        <label>Nhiệt độ (°C) <input type="number" id="temperature" min="34" max="43" step="0.1" inputmode="decimal"></label>
+        <label>Số ngày sốt <input type="number" id="fever_days" min="0" max="30" inputmode="numeric"></label>
+        <label class="full">Dị ứng thuốc (nếu có) <input type="text" id="allergies" placeholder="vd: penicillin, ibuprofen"></label>
+        <label class="check full"><input type="checkbox" id="pregnant"> Đang mang thai</label>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>4. Triệu chứng đang gặp</h2>
+      <div id="symptomList"></div>
+    </section>
+
+    <button type="submit" class="btn primary big">Phân tích & tìm nơi khám / nhà thuốc</button>
+  </form>
+
+  <section id="results" hidden>
+    <div id="emergency" class="alert danger" hidden></div>
+    <div id="warnings"></div>
+    <h2 id="resultTitle">Kết quả phân tích</h2>
+    <div id="conditions"></div>
+
+    <h2>Cơ sở y tế & nhà thuốc trong bán kính 10 km</h2>
+    <div class="row filters" id="filters">
+      <button type="button" data-f="all" class="chip active">Tất cả</button>
+      <button type="button" data-f="pharmacy" class="chip">Nhà thuốc</button>
+      <button type="button" data-f="clinic" class="chip">Phòng khám</button>
+      <button type="button" data-f="hospital" class="chip">Bệnh viện</button>
+    </div>
+    <div id="map"></div>
+    <p id="placesStatus" class="muted"></p>
+    <ul id="places" class="places"></ul>
+  </section>
+</main>
+
+<footer class="wrap muted">
+  Dữ liệu bản đồ © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> contributors.
+  Mọi phân tích chạy ngay trên thiết bị của bạn.
+</footer>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="src/knowledge.js"></script>
+<script src="src/engine.js"></script>
+<script src="src/geo.js"></script>
+<script src="src/app.js"></script>
+</body>
+</html>

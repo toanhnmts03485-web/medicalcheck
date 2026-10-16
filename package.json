@@ -1,0 +1,7 @@
+{
+  "name": "suckhoe-ai",
+  "version": "1.0.0",
+  "description": "Ứng dụng web phân tích triệu chứng, gợi ý nhóm thuốc và tìm cơ sở y tế/nhà thuốc trong bán kính 10 km",
+  "scripts": { "test": "node --test tests/engine.test.js", "start": "npx --yes serve ." },
+  "license": "MIT"
+}
