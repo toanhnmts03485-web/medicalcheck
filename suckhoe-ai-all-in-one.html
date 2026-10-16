@@ -1,0 +1,667 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SứcKhỏe AI – Phân tích triệu chứng & tìm nhà thuốc gần bạn</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<style>
+:root{--bg:#f4f8f8;--card:#fff;--ink:#16302f;--muted:#5d7776;--brand:#0b7a75;--brand-d:#085a56;--line:#d8e4e3;--danger:#c62828;--warn:#b26a00}
+*{box-sizing:border-box}
+body{margin:0;font:16px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;background:var(--bg);color:var(--ink)}
+.wrap{max-width:860px;margin:0 auto;padding:0 16px}
+.top{background:linear-gradient(135deg,var(--brand),#13a39b);color:#fff;padding:22px 0}
+.top h1{margin:0;font-size:1.7rem}.top p{margin:4px 0 0;opacity:.92}
+.disclaimer{background:#fff4d6;border-bottom:1px solid #f0d58a;padding:10px 16px;text-align:center;font-size:.92rem}
+main{padding-top:16px;padding-bottom:24px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px;margin:0 0 14px}
+h2{font-size:1.15rem;margin:18px 0 8px}.card h2{margin-top:0}
+.muted{color:var(--muted);font-size:.9rem}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px}
+.grid .full{grid-column:1/-1}
+label{display:flex;flex-direction:column;gap:4px;font-size:.92rem}
+input[type=text],input[type=number],select{padding:9px 10px;border:1px solid var(--line);border-radius:8px;font:inherit;background:#fff}
+.checks{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:6px 12px}
+label.check{flex-direction:row;align-items:flex-start;gap:8px;font-size:.95rem;cursor:pointer}
+label.check input{margin-top:4px}
+fieldset{border:1px solid var(--line);border-radius:10px;margin:0 0 10px;padding:8px 12px}
+legend{font-weight:600;color:var(--brand-d);padding:0 6px}
+.row{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.row input[type=text]{flex:1;min-width:180px}
+.btn{border:0;border-radius:10px;padding:10px 16px;font:inherit;cursor:pointer}
+.btn.primary{background:var(--brand);color:#fff}.btn.primary:hover{background:var(--brand-d)}
+.btn.secondary{background:#e3f1f0;color:var(--brand-d)}
+.btn.big{width:100%;padding:14px;font-size:1.05rem;font-weight:600}
+.alert{border-radius:10px;padding:12px 14px;margin:0 0 10px}
+.alert.danger{background:#fdeaea;border:2px solid var(--danger);color:#7a1212}
+.alert.danger h3{margin:0 0 6px}
+.alert.warn{background:#fff4d6;border:1px solid #f0d58a;color:#6b4300}
+.cond-head{display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;align-items:center}
+.cond h3{margin:0}.cond h4{margin:14px 0 4px}
+.badge{padding:3px 10px;border-radius:99px;font-size:.82rem;font-weight:600;background:#e3f1f0;color:var(--brand-d)}
+.badge.cao{background:#fde3e3;color:#8a1b1b}.badge.trung-bình{background:#fff0cc;color:#7a5200}
+.bar{height:6px;background:#e6efee;border-radius:99px;margin:8px 0}.bar i{display:block;height:100%;background:var(--brand);border-radius:99px}
+.avoid{background:#fdeaea;color:#7a1212;padding:8px 10px;border-radius:8px}
+.chip{border:1px solid var(--line);background:#fff;border-radius:99px;padding:6px 14px;cursor:pointer;font:inherit}
+.chip.active{background:var(--brand);color:#fff;border-color:var(--brand)}
+#map{height:340px;border-radius:12px;border:1px solid var(--line);margin:10px 0}
+.places{list-style:none;padding:0;margin:0}
+.place{background:#fff;border:1px solid var(--line);border-left:5px solid #888;border-radius:10px;padding:10px 12px;margin-bottom:8px}
+.place.pharmacy{border-left-color:#2e9e4f}.place.clinic{border-left-color:#e08a00}.place.hospital{border-left-color:#d33}
+.tag{font-size:.75rem;background:#eef3f3;border-radius:6px;padding:1px 6px;margin-left:4px}
+.links{display:flex;gap:14px;margin-top:4px}.links a{color:var(--brand-d);text-decoration:none;font-size:.92rem}
+footer{padding-top:8px;padding-bottom:30px}
+@media(max-width:520px){.checks{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<header class="top">
+  <div class="wrap">
+    <h1>🩺 SứcKhỏe AI</h1>
+    <p>Phân tích triệu chứng · gợi ý nhóm thuốc · tìm cơ sở y tế trong bán kính 10 km</p>
+  </div>
+</header>
+
+<div class="disclaimer" role="note">
+  <strong>⚠️ Lưu ý quan trọng:</strong> Ứng dụng chỉ cung cấp thông tin tham khảo, <u>không phải chẩn đoán y khoa</u> và không thay thế bác sĩ.
+  Không tự dùng kháng sinh. Nếu có dấu hiệu nguy hiểm hãy gọi <a href="tel:115"><strong>115</strong></a> ngay.
+</div>
+
+<main class="wrap">
+  <form id="form" autocomplete="off">
+    <section class="card">
+      <h2>1. Thông tin của bạn</h2>
+      <div class="grid">
+        <label class="full">Họ và tên <input type="text" id="fullname" autocomplete="name" placeholder="vd: Nguyễn Văn A"></label>
+        <label>Ngày tháng năm sinh <input type="date" id="dob" autocomplete="bday"></label>
+        <label class="full">Nơi ở hiện tại <input type="text" id="address" autocomplete="street-address" placeholder="Số nhà, đường, phường/xã, quận/huyện, tỉnh/thành"></label>
+      </div>
+      <div class="row">
+        <button type="button" id="btnGeocode" class="btn secondary">Xác định theo địa chỉ</button>
+        <button type="button" id="btnLocate" class="btn secondary">📍 Dùng vị trí GPS</button>
+      </div>
+      <p id="locStatus" class="muted">Địa chỉ/vị trí chỉ dùng để tìm nơi khám trong 10 km, không được lưu lại.</p>
+    </section>
+
+    <section class="card" id="redflags">
+      <h2>2. Dấu hiệu nguy hiểm</h2>
+      <p class="muted">Bạn có dấu hiệu nào dưới đây không?</p>
+      <div id="rfList" class="checks"></div>
+    </section>
+
+    <section class="card">
+      <h2>3. Tình trạng hiện tại</h2>
+      <div class="grid">
+        <label>Nhiệt độ (°C) <input type="number" id="temperature" min="34" max="43" step="0.1" inputmode="decimal"></label>
+        <label>Số ngày sốt <input type="number" id="fever_days" min="0" max="30" inputmode="numeric"></label>
+        <label class="full">Dị ứng thuốc (nếu có) <input type="text" id="allergies" placeholder="vd: penicillin, ibuprofen"></label>
+        <label class="check full"><input type="checkbox" id="pregnant"> Đang mang thai</label>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>4. Triệu chứng đang gặp</h2>
+      <div id="symptomList"></div>
+    </section>
+
+    <button type="submit" class="btn primary big">Phân tích & tìm nơi khám / nhà thuốc</button>
+  </form>
+
+  <section id="results" hidden>
+    <div id="emergency" class="alert danger" hidden></div>
+    <div id="warnings"></div>
+    <h2 id="resultTitle">Kết quả phân tích</h2>
+    <div id="conditions"></div>
+
+    <h2>Cơ sở y tế & nhà thuốc trong bán kính 10 km</h2>
+    <div class="row filters" id="filters">
+      <button type="button" data-f="all" class="chip active">Tất cả</button>
+      <button type="button" data-f="pharmacy" class="chip">Nhà thuốc</button>
+      <button type="button" data-f="clinic" class="chip">Phòng khám</button>
+      <button type="button" data-f="hospital" class="chip">Bệnh viện</button>
+    </div>
+    <div id="map"></div>
+    <p id="placesStatus" class="muted"></p>
+    <ul id="places" class="places"></ul>
+  </section>
+</main>
+
+<footer class="wrap muted">
+  Dữ liệu bản đồ © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> contributors.
+  Mọi phân tích chạy ngay trên thiết bị của bạn.
+</footer>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+/* ===== src/knowledge.js ===== */
+/* Cơ sở tri thức: triệu chứng, bệnh thường gặp, nhóm thuốc không kê đơn.
+ * Chỉ mang tính tham khảo giáo dục, KHÔNG thay thế chẩn đoán của bác sĩ. */
+(function (root) {
+  const SYMPTOMS = [
+    { id: 'sot', label: 'Sốt', group: 'Toàn thân' },
+    { id: 'on_lanh', label: 'Ớn lạnh / rét run', group: 'Toàn thân' },
+    { id: 'met_moi', label: 'Mệt mỏi, uể oải', group: 'Toàn thân' },
+    { id: 'dau_co', label: 'Đau nhức cơ, đau mình mẩy', group: 'Toàn thân' },
+    { id: 'dau_sau_mat', label: 'Đau sau hốc mắt', group: 'Toàn thân' },
+    { id: 'phat_ban', label: 'Phát ban / nổi mẩn đỏ', group: 'Toàn thân' },
+    { id: 'xuat_huyet', label: 'Chảy máu chân răng / chấm xuất huyết dưới da', group: 'Toàn thân' },
+    { id: 'mat_vi_giac', label: 'Mất vị giác / khứu giác', group: 'Toàn thân' },
+
+    { id: 'ho_khan', label: 'Ho khan', group: 'Hô hấp / Tai mũi họng' },
+    { id: 'ho_dam', label: 'Ho có đờm', group: 'Hô hấp / Tai mũi họng' },
+    { id: 'so_mui', label: 'Nghẹt mũi', group: 'Hô hấp / Tai mũi họng' },
+    { id: 'chay_mui', label: 'Chảy nước mũi', group: 'Hô hấp / Tai mũi họng' },
+    { id: 'hat_hoi', label: 'Hắt hơi nhiều', group: 'Hô hấp / Tai mũi họng' },
+    { id: 'dau_hong', label: 'Đau / rát họng', group: 'Hô hấp / Tai mũi họng' },
+    { id: 'dau_vung_mat', label: 'Đau tức vùng mặt, trán, gò má', group: 'Hô hấp / Tai mũi họng' },
+    { id: 'kho_tho', label: 'Khó thở / thở khò khè', group: 'Hô hấp / Tai mũi họng' },
+
+    { id: 'dau_dau', label: 'Đau đầu', group: 'Thần kinh' },
+    { id: 'dau_nua_dau', label: 'Đau một bên đầu, theo nhịp mạch đập', group: 'Thần kinh' },
+    { id: 'nhay_cam_anh_sang', label: 'Sợ ánh sáng / tiếng ồn', group: 'Thần kinh' },
+    { id: 'chong_mat', label: 'Chóng mặt', group: 'Thần kinh' },
+
+    { id: 'buon_non', label: 'Buồn nôn', group: 'Tiêu hóa' },
+    { id: 'non', label: 'Nôn ói', group: 'Tiêu hóa' },
+    { id: 'tieu_chay', label: 'Tiêu chảy', group: 'Tiêu hóa' },
+    { id: 'dau_bung_tren', label: 'Đau / nóng rát vùng thượng vị (trên rốn)', group: 'Tiêu hóa' },
+    { id: 'dau_bung_quanh_ron', label: 'Đau quặn bụng', group: 'Tiêu hóa' },
+    { id: 'o_chua', label: 'Ợ chua / ợ nóng, nóng rát sau xương ức', group: 'Tiêu hóa' },
+    { id: 'day_bung', label: 'Đầy hơi, khó tiêu', group: 'Tiêu hóa' },
+
+    { id: 'tieu_buot', label: 'Tiểu buốt / tiểu rát', group: 'Tiết niệu' },
+    { id: 'tieu_nhieu', label: 'Tiểu nhiều lần, tiểu gấp', group: 'Tiết niệu' },
+    { id: 'dau_bung_duoi', label: 'Đau vùng bụng dưới / trên xương mu', group: 'Tiết niệu' },
+
+    { id: 'do_mat', label: 'Đỏ mắt', group: 'Mắt / Da' },
+    { id: 'ngua_mat', label: 'Ngứa mắt, chảy nước mắt', group: 'Mắt / Da' },
+    { id: 'ghen_mat', label: 'Ghèn mắt, dính mi sáng ngủ dậy', group: 'Mắt / Da' },
+    { id: 'ngua_da', label: 'Ngứa da', group: 'Mắt / Da' },
+  ];
+
+  /* Dấu hiệu nguy hiểm: cần gọi 115 / đến cấp cứu ngay */
+  const RED_FLAGS = [
+    { id: 'rf_dau_nguc', label: 'Đau thắt ngực, đau tức ngực lan tay/hàm' },
+    { id: 'rf_kho_tho', label: 'Khó thở nặng, môi tím tái' },
+    { id: 'rf_lu_lan', label: 'Lú lẫn, co giật hoặc ngất xỉu' },
+    { id: 'rf_cung_co', label: 'Cứng gáy kèm sốt cao, đau đầu dữ dội' },
+    { id: 'rf_liet', label: 'Yếu liệt một bên người, méo miệng, nói khó' },
+    { id: 'rf_chay_mau', label: 'Nôn ra máu, đi ngoài phân đen/có máu, chảy máu không cầm' },
+    { id: 'rf_mat_nuoc', label: 'Mất nước nặng: khát dữ dội, tiểu rất ít, mắt trũng, lả người' },
+    { id: 'rf_dau_bung_du', label: 'Đau bụng dữ dội, bụng cứng như gỗ' },
+    { id: 'rf_dau_dau_set_danh', label: 'Đau đầu dữ dội đột ngột như "sét đánh"' },
+  ];
+
+  /* Nhóm thuốc: chỉ nêu hoạt chất/nhóm thuốc phổ biến để hỏi dược sĩ. */
+  const DRUGS = {
+    ha_sot: { group: 'Hạ sốt – giảm đau', examples: 'Paracetamol (acetaminophen)', note: 'Liều theo cân nặng/tuổi; không quá 4 g/ngày ở người lớn; thận trọng khi bệnh gan, nghiện rượu.' },
+    nsaid: { group: 'Giảm đau – kháng viêm không steroid (NSAID)', examples: 'Ibuprofen', note: 'Uống sau ăn. Tránh nếu loét dạ dày, bệnh thận, hen suyễn nhạy cảm NSAID, phụ nữ có thai. TUYỆT ĐỐI không dùng khi nghi sốt xuất huyết.' },
+    bu_nuoc: { group: 'Bù nước – điện giải', examples: 'Oresol (ORS)', note: 'Pha đúng hướng dẫn, uống từng ngụm nhỏ nhiều lần.' },
+    xit_mui: { group: 'Rửa mũi / xịt mũi', examples: 'Nước muối sinh lý 0,9%; xịt mũi corticoid (theo tư vấn)', note: 'Thuốc co mạch xịt mũi không dùng quá 3–5 ngày.' },
+    chong_di_ung: { group: 'Kháng histamin H1', examples: 'Cetirizine, Loratadine, Fexofenadine', note: 'Thế hệ cũ (chlorpheniramine) gây buồn ngủ; thận trọng khi lái xe.' },
+    long_dam: { group: 'Long đờm / giảm ho', examples: 'Acetylcystein, Ambroxol, Bromhexin', note: 'Không dùng thuốc ức chế ho cho ho có đờm nhiều. Trẻ <2 tuổi cần bác sĩ chỉ định.' },
+    ngam_ho: { group: 'Giảm đau họng tại chỗ', examples: 'Viên ngậm sát khuẩn họng, súc họng nước muối ấm', note: 'Uống nhiều nước ấm, tránh đồ lạnh/cay.' },
+    khang_acid: { group: 'Trung hòa / giảm tiết acid dạ dày', examples: 'Antacid (nhôm/magie hydroxit), Alginate; PPI/H2 theo tư vấn dược sĩ', note: 'Dùng kéo dài >2 tuần cần khám. Cách xa thuốc khác ≥2 giờ.' },
+    chong_non: { group: 'Chống nôn', examples: 'Domperidon (ngắn ngày), Oresol phối hợp', note: 'Chỉ dùng ngắn ngày theo hướng dẫn.' },
+    men_vi_sinh: { group: 'Men vi sinh', examples: 'Lactobacillus, Saccharomyces boulardii', note: 'Hỗ trợ tiêu chảy; không thay thế bù nước.' },
+    khang_sinh: { group: 'Kháng sinh (BẮT BUỘC có đơn bác sĩ)', examples: 'Do bác sĩ chỉ định sau khi khám/xét nghiệm', note: 'Không tự mua/dùng kháng sinh: gây kháng thuốc, dùng sai không có tác dụng với bệnh do virus.' },
+    thuoc_mat: { group: 'Thuốc nhỏ mắt', examples: 'Nước muối sinh lý nhỏ mắt, nước mắt nhân tạo; kháng sinh nhỏ mắt khi bác sĩ chỉ định', note: 'Không dùng thuốc nhỏ mắt chứa corticoid khi chưa khám.' },
+    thuoc_dau_nua: { group: 'Cắt cơn đau nửa đầu', examples: 'Paracetamol / Ibuprofen sớm khi có cơn; nhóm triptan cần kê đơn', note: 'Nằm phòng tối yên tĩnh; tránh lạm dụng thuốc giảm đau >10 ngày/tháng.' },
+  };
+
+  /* Bệnh: w = trọng số của triệu chứng (1–5). */
+  const CONDITIONS = [
+    {
+      id: 'cam_lanh', name: 'Cảm lạnh thông thường', specialty: 'Nội tổng quát / Tai mũi họng',
+      summary: 'Nhiễm virus đường hô hấp trên nhẹ, thường tự khỏi sau 7–10 ngày.',
+      weights: { so_mui: 4, chay_mui: 4, hat_hoi: 3, dau_hong: 3, ho_khan: 2, met_moi: 1, sot: 1 },
+      drugs: ['xit_mui', 'ha_sot', 'ngam_ho'],
+      advice: ['Nghỉ ngơi, uống nhiều nước ấm.', 'Rửa mũi bằng nước muối sinh lý.', 'Đi khám nếu sốt >3 ngày hoặc triệu chứng nặng lên sau 7 ngày.'],
+      facility: ['pharmacy', 'clinic'],
+    },
+    {
+      id: 'cum', name: 'Cúm (Influenza)', specialty: 'Nội tổng quát',
+      summary: 'Khởi phát đột ngột với sốt cao, đau mỏi người, mệt nhiều, ho khan.',
+      weights: { sot: 5, on_lanh: 4, dau_co: 4, met_moi: 3, ho_khan: 3, dau_dau: 2, dau_hong: 2, so_mui: 1 },
+      drugs: ['ha_sot', 'bu_nuoc', 'ngam_ho'],
+      advice: ['Nghỉ ngơi, bù nước, đeo khẩu trang tránh lây.', 'Người già, trẻ nhỏ, thai phụ, bệnh nền nên đi khám sớm (có thể cần thuốc kháng virus theo đơn).'],
+      facility: ['clinic', 'hospital', 'pharmacy'],
+    },
+    {
+      id: 'covid', name: 'COVID-19 (cần xét nghiệm để xác định)', specialty: 'Truyền nhiễm / Nội tổng quát',
+      summary: 'Triệu chứng giống cúm; mất vị giác/khứu giác là dấu hiệu gợi ý đặc trưng.',
+      weights: { mat_vi_giac: 5, sot: 3, ho_khan: 3, dau_hong: 2, met_moi: 3, dau_co: 2, kho_tho: 2 },
+      drugs: ['ha_sot', 'bu_nuoc'],
+      advice: ['Tự test nhanh kháng nguyên; hạn chế tiếp xúc người khác.', 'Theo dõi SpO₂ nếu có máy; đi khám ngay nếu khó thở.'],
+      facility: ['clinic', 'hospital'],
+    },
+    {
+      id: 'viem_hong', name: 'Viêm họng', specialty: 'Tai mũi họng',
+      summary: 'Viêm niêm mạc họng do virus hoặc vi khuẩn; vi khuẩn (liên cầu) cần kháng sinh theo đơn.',
+      weights: { dau_hong: 5, sot: 2, ho_khan: 2, met_moi: 1, so_mui: 1 },
+      drugs: ['ngam_ho', 'ha_sot', 'khang_sinh'],
+      advice: ['Súc họng nước muối ấm, uống nước ấm.', 'Đi khám nếu họng có mủ trắng, sốt cao, đau khi nuốt nhiều >3 ngày.'],
+      facility: ['clinic', 'pharmacy'],
+    },
+    {
+      id: 'viem_xoang', name: 'Viêm xoang', specialty: 'Tai mũi họng',
+      summary: 'Viêm các xoang cạnh mũi: nghẹt mũi, đau tức vùng mặt, dịch mũi đặc.',
+      weights: { dau_vung_mat: 5, so_mui: 4, chay_mui: 3, dau_dau: 2, ho_dam: 1, sot: 1 },
+      drugs: ['xit_mui', 'ha_sot', 'khang_sinh'],
+      advice: ['Rửa mũi nước muối đều đặn, xông hơi ấm.', 'Triệu chứng >10 ngày hoặc sốt cao: đi khám để cân nhắc kháng sinh.'],
+      facility: ['clinic', 'hospital'],
+    },
+    {
+      id: 'viem_phe_quan', name: 'Viêm phế quản', specialty: 'Hô hấp / Nội tổng quát',
+      summary: 'Ho kéo dài có đờm sau nhiễm trùng hô hấp; có thể khò khè nhẹ.',
+      weights: { ho_dam: 5, ho_khan: 2, kho_tho: 3, met_moi: 2, sot: 2, dau_hong: 1 },
+      drugs: ['long_dam', 'ha_sot', 'khang_sinh'],
+      advice: ['Uống nhiều nước, tránh khói thuốc, bụi.', 'Ho >3 tuần, khó thở hoặc ho ra máu cần đi khám/chụp X-quang.'],
+      facility: ['clinic', 'hospital'],
+    },
+    {
+      id: 'di_ung', name: 'Viêm mũi dị ứng', specialty: 'Tai mũi họng / Dị ứng – miễn dịch',
+      summary: 'Hắt hơi từng tràng, ngứa mũi/mắt, chảy mũi trong, không sốt.',
+      weights: { hat_hoi: 5, chay_mui: 4, ngua_mat: 4, so_mui: 3, ngua_da: 2, phat_ban: 1 },
+      drugs: ['chong_di_ung', 'xit_mui'],
+      advice: ['Tránh tác nhân (bụi, phấn hoa, lông thú).', 'Nếu tái diễn thường xuyên, nên khám để làm test dị ứng.'],
+      facility: ['pharmacy', 'clinic'],
+    },
+    {
+      id: 'sxh', name: 'Sốt xuất huyết Dengue (nghi ngờ)', specialty: 'Truyền nhiễm / Nội tổng quát',
+      summary: 'Sốt cao liên tục 2–7 ngày, đau sau hốc mắt, đau cơ, có thể xuất huyết. Có thể diễn tiến nặng ở ngày 3–6.',
+      weights: { sot: 4, dau_sau_mat: 5, dau_co: 3, xuat_huyet: 5, phat_ban: 3, dau_dau: 3, buon_non: 2, met_moi: 2 },
+      drugs: ['ha_sot', 'bu_nuoc'],
+      advice: ['Chỉ dùng Paracetamol hạ sốt; KHÔNG dùng Aspirin/Ibuprofen/NSAID.', 'Nên đi xét nghiệm (công thức máu, NS1) sớm và theo dõi tại cơ sở y tế.', 'Đến cấp cứu nếu đau bụng, nôn nhiều, chảy máu, lừ đừ, tay chân lạnh.'],
+      facility: ['hospital', 'clinic'],
+      avoid: ['nsaid'],
+    },
+    {
+      id: 'viem_da_day', name: 'Viêm / loét dạ dày', specialty: 'Tiêu hóa',
+      summary: 'Đau/nóng rát vùng thượng vị, đầy hơi, buồn nôn, thường liên quan bữa ăn, vi khuẩn H. pylori, thuốc NSAID.',
+      weights: { dau_bung_tren: 5, day_bung: 3, buon_non: 3, o_chua: 3, non: 2 },
+      drugs: ['khang_acid', 'chong_non'],
+      advice: ['Ăn chia nhỏ bữa, tránh rượu bia, cà phê, đồ cay; không dùng NSAID.', 'Đi khám nội soi/xét nghiệm H. pylori nếu đau tái diễn, sụt cân, đi ngoài phân đen.'],
+      facility: ['clinic', 'hospital', 'pharmacy'],
+      avoid: ['nsaid'],
+    },
+    {
+      id: 'trao_nguoc', name: 'Trào ngược dạ dày – thực quản (GERD)', specialty: 'Tiêu hóa',
+      summary: 'Ợ nóng, ợ chua, nóng rát sau xương ức, nặng hơn khi nằm hoặc sau ăn no.',
+      weights: { o_chua: 5, dau_bung_tren: 3, day_bung: 2, ho_khan: 1, buon_non: 1 },
+      drugs: ['khang_acid'],
+      advice: ['Không nằm ngay sau ăn, kê cao đầu giường, giảm cân nếu thừa cân.', 'Đau ngực lan tay/hàm cần loại trừ bệnh tim, đi cấp cứu.'],
+      facility: ['clinic', 'pharmacy'],
+    },
+    {
+      id: 'tieu_chay', name: 'Viêm dạ dày – ruột cấp / ngộ độc thực phẩm', specialty: 'Tiêu hóa / Nội tổng quát',
+      summary: 'Tiêu chảy, nôn, đau quặn bụng sau ăn uống không đảm bảo vệ sinh; nguy cơ mất nước.',
+      weights: { tieu_chay: 5, non: 4, dau_bung_quanh_ron: 4, buon_non: 3, sot: 2, met_moi: 1 },
+      drugs: ['bu_nuoc', 'men_vi_sinh', 'chong_non'],
+      advice: ['Ưu tiên bù nước (Oresol), ăn nhẹ dễ tiêu.', 'Đi khám nếu tiêu chảy >2 ngày, phân có máu/nhầy, sốt cao, hoặc có dấu hiệu mất nước.'],
+      facility: ['clinic', 'hospital', 'pharmacy'],
+    },
+    {
+      id: 'nhiem_trung_tiet_nieu', name: 'Nhiễm trùng đường tiết niệu', specialty: 'Tiết niệu / Nội tổng quát',
+      summary: 'Tiểu buốt, tiểu nhiều lần, đau bụng dưới; cần xét nghiệm nước tiểu và thường dùng kháng sinh theo đơn.',
+      weights: { tieu_buot: 5, tieu_nhieu: 4, dau_bung_duoi: 3, sot: 1, met_moi: 1 },
+      drugs: ['khang_sinh', 'ha_sot'],
+      advice: ['Uống nhiều nước.', 'Nên đi khám trong 24–48 giờ; sốt, đau lưng, tiểu máu có thể là nhiễm trùng thận.'],
+      facility: ['clinic', 'hospital'],
+    },
+    {
+      id: 'dau_nua_dau', name: 'Đau nửa đầu (Migraine)', specialty: 'Thần kinh',
+      summary: 'Đau đầu một bên, theo nhịp mạch, kèm buồn nôn, sợ ánh sáng/tiếng ồn.',
+      weights: { dau_nua_dau: 5, nhay_cam_anh_sang: 4, buon_non: 3, dau_dau: 3, non: 2, chong_mat: 1 },
+      drugs: ['thuoc_dau_nua'],
+      advice: ['Nghỉ ở phòng tối, yên tĩnh; ghi nhật ký tác nhân (thiếu ngủ, stress, thực phẩm).', 'Khám thần kinh nếu cơn thường xuyên hoặc kiểu đau đầu thay đổi.'],
+      facility: ['clinic', 'hospital'],
+    },
+    {
+      id: 'dau_dau_cang_thang', name: 'Đau đầu căng thẳng', specialty: 'Nội tổng quát / Thần kinh',
+      summary: 'Đau âm ỉ hai bên như bị đè/siết quanh đầu, liên quan stress, thiếu ngủ.',
+      weights: { dau_dau: 5, met_moi: 2, dau_co: 1 },
+      drugs: ['ha_sot', 'nsaid'],
+      advice: ['Ngủ đủ, giảm căng thẳng, thư giãn cổ vai.', 'Khám nếu đau đầu mới xuất hiện sau 50 tuổi hoặc kèm yếu liệt/nhìn mờ.'],
+      facility: ['pharmacy', 'clinic'],
+    },
+    {
+      id: 'viem_ket_mac', name: 'Viêm kết mạc (đau mắt đỏ)', specialty: 'Nhãn khoa',
+      summary: 'Mắt đỏ, ngứa/cộm, chảy ghèn hoặc nước mắt; dễ lây nếu do virus/vi khuẩn.',
+      weights: { do_mat: 5, ghen_mat: 4, ngua_mat: 3, sot: 1 },
+      drugs: ['thuoc_mat'],
+      advice: ['Rửa tay thường xuyên, không dùng chung khăn, không dụi mắt.', 'Đi khám mắt nếu giảm thị lực, đau mắt nhiều hoặc sợ ánh sáng.'],
+      facility: ['clinic', 'hospital', 'pharmacy'],
+    },
+  ];
+
+  const api = { SYMPTOMS, RED_FLAGS, DRUGS, CONDITIONS };
+  if (typeof module !== 'undefined' && module.exports) module.exports = api;
+  else root.Knowledge = api;
+})(typeof window !== 'undefined' ? window : globalThis);
+</script>
+<script>
+/* ===== src/engine.js ===== */
+/* Bộ phân tích: chấm điểm bệnh theo triệu chứng + điều chỉnh theo hồ sơ người dùng. */
+(function (root) {
+  const K = typeof require !== 'undefined' ? require('./knowledge.js') : root.Knowledge;
+
+  function analyze(input) {
+    const symptoms = new Set(input.symptoms || []);
+    const profile = input.profile || {};
+    const redFlags = input.redFlags || [];
+    const result = { emergency: redFlags.length > 0, redFlags: K.RED_FLAGS.filter(r => redFlags.includes(r.id)), conditions: [], warnings: [] };
+
+    const temp = Number(profile.temperature) || 0;
+    if (temp >= 39.5) result.warnings.push('Sốt ≥ 39,5 °C: nên đến cơ sở y tế trong ngày.');
+    if (temp >= 38 && Number(profile.fever_days) >= 3) result.warnings.push('Sốt kéo dài từ 3 ngày: cần được bác sĩ thăm khám.');
+    const age = Number(profile.age);
+    if (age && age < 5) result.warnings.push('Trẻ dưới 5 tuổi: không tự dùng thuốc, hãy đưa trẻ đến bác sĩ nhi.');
+    if (age >= 65) result.warnings.push('Người từ 65 tuổi: bệnh dễ diễn tiến nặng, nên đi khám sớm thay vì tự điều trị.');
+    if (profile.pregnant) result.warnings.push('Đang mang thai: hỏi bác sĩ/dược sĩ trước khi dùng BẤT KỲ loại thuốc nào.');
+
+    if (symptoms.size === 0) return result;
+
+    const scored = [];
+    for (const c of K.CONDITIONS) {
+      const total = Object.values(c.weights).reduce((a, b) => a + b, 0);
+      let matched = 0, matchedCount = 0;
+      const matchedIds = [];
+      for (const [sid, w] of Object.entries(c.weights)) {
+        if (symptoms.has(sid)) { matched += w; matchedCount++; matchedIds.push(sid); }
+      }
+      if (matchedCount === 0) continue;
+      // Độ phủ của bệnh (bao nhiêu % đặc trưng bệnh có mặt) và độ giải thích (bao nhiêu % triệu chứng của người dùng được bệnh giải thích)
+      const coverage = matched / total;
+      const explained = matchedCount / symptoms.size;
+      let score = 0.6 * coverage + 0.4 * explained;
+      // Bệnh chỉ khớp 1 triệu chứng chung chung thì giảm điểm
+      if (matchedCount === 1) score *= 0.6;
+      // Điều chỉnh theo hồ sơ
+      if (c.id === 'sxh' && temp >= 38.5) score *= 1.1;
+      if (c.id === 'cum' && temp >= 38.5) score *= 1.1;
+      if (c.id === 'di_ung' && temp >= 38) score *= 0.5;
+      scored.push({ condition: c, score: Math.min(score, 1), matchedIds });
+    }
+    scored.sort((a, b) => b.score - a.score);
+
+    const top = scored.slice(0, 4).filter(s => s.score >= 0.12);
+    result.conditions = top.map(s => {
+      const c = s.condition;
+      const pct = Math.round(s.score * 100);
+      const drugs = c.drugs.map(d => ({ ...K.DRUGS[d], id: d }));
+      const blocked = new Set(c.avoid || []);
+      if (age && age < 12) blocked.add('nsaid');
+      if (profile.pregnant) { blocked.add('nsaid'); }
+      const allergies = (profile.allergies || '').toLowerCase();
+      if (allergies.includes('paracetamol')) blocked.add('ha_sot');
+      if (/ibuprofen|nsaid|aspirin/.test(allergies)) blocked.add('nsaid');
+      return {
+        id: c.id, name: c.name, summary: c.summary, specialty: c.specialty,
+        likelihood: pct, level: pct >= 55 ? 'cao' : pct >= 35 ? 'trung bình' : 'thấp',
+        matched: s.matchedIds.map(id => K.SYMPTOMS.find(x => x.id === id).label),
+        advice: c.advice,
+        drugs: drugs.filter(d => !blocked.has(d.id)),
+        avoidDrugs: [...blocked].filter(id => K.DRUGS[id]).map(id => K.DRUGS[id].group),
+        facility: c.facility,
+      };
+    });
+    return result;
+  }
+
+  const api = { analyze };
+  if (typeof module !== 'undefined' && module.exports) module.exports = api;
+  else root.Engine = api;
+})(typeof window !== 'undefined' ? window : globalThis);
+</script>
+<script>
+/* ===== src/geo.js ===== */
+/* Tìm cơ sở y tế / nhà thuốc quanh người dùng qua OpenStreetMap (Overpass API + Nominatim). */
+(function (root) {
+  const MAX_RADIUS_M = 10000; // tối đa 10 km
+  const OVERPASS = ['https://overpass-api.de/api/interpreter', 'https://overpass.kumi.systems/api/interpreter'];
+
+  const TYPE_LABEL = { pharmacy: 'Nhà thuốc', hospital: 'Bệnh viện', clinic: 'Phòng khám', doctors: 'Phòng khám' };
+
+  function haversineKm(a, b) {
+    const R = 6371, toRad = d => d * Math.PI / 180;
+    const dLat = toRad(b.lat - a.lat), dLon = toRad(b.lon - a.lon);
+    const h = Math.sin(dLat / 2) ** 2 + Math.cos(toRad(a.lat)) * Math.cos(toRad(b.lat)) * Math.sin(dLon / 2) ** 2;
+    return 2 * R * Math.asin(Math.sqrt(h));
+  }
+
+  function buildQuery(center, radiusM) {
+    const r = Math.min(radiusM, MAX_RADIUS_M);
+    const around = `(around:${r},${center.lat},${center.lon})`;
+    return `[out:json][timeout:25];(` +
+      `nwr${around}[amenity~"^(pharmacy|hospital|clinic|doctors)$"];` +
+      `nwr${around}[healthcare~"^(pharmacy|hospital|clinic|doctor)$"];` +
+      `);out center 400;`;
+  }
+
+  function normalize(elements, center, radiusKm) {
+    const seen = new Set(), out = [];
+    for (const el of elements) {
+      const lat = el.lat ?? el.center?.lat, lon = el.lon ?? el.center?.lon;
+      if (lat == null || lon == null) continue;
+      const t = el.tags || {};
+      const kind = t.amenity || ({ doctor: 'doctors' }[t.healthcare] || t.healthcare);
+      if (!TYPE_LABEL[kind]) continue;
+      const name = t.name || t['name:vi'] || TYPE_LABEL[kind] + ' (chưa có tên)';
+      const distanceKm = haversineKm(center, { lat, lon });
+      if (distanceKm > radiusKm) continue;
+      const key = `${name}|${lat.toFixed(4)}|${lon.toFixed(4)}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      const address = [t['addr:housenumber'], t['addr:street'], t['addr:suburb'] || t['addr:subdistrict'], t['addr:city'] || t['addr:district']].filter(Boolean).join(', ');
+      out.push({
+        id: `${el.type}/${el.id}`, name, kind: kind === 'doctors' ? 'clinic' : kind, label: TYPE_LABEL[kind],
+        lat, lon, distanceKm, address, phone: t.phone || t['contact:phone'] || '', hours: t.opening_hours || '',
+        emergency: t.emergency === 'yes',
+      });
+    }
+    return out.sort((a, b) => a.distanceKm - b.distanceKm);
+  }
+
+  async function findNearby(center, radiusKm = 10) {
+    const radiusM = Math.min(radiusKm, 10) * 1000;
+    const body = 'data=' + encodeURIComponent(buildQuery(center, radiusM));
+    let lastErr;
+    for (const url of OVERPASS) {
+      try {
+        const res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body });
+        if (!res.ok) throw new Error('Overpass HTTP ' + res.status);
+        const json = await res.json();
+        return normalize(json.elements || [], center, Math.min(radiusKm, 10));
+      } catch (e) { lastErr = e; }
+    }
+    throw lastErr;
+  }
+
+  async function geocode(query) {
+    const url = 'https://nominatim.openstreetmap.org/search?format=json&limit=1&countrycodes=vn&accept-language=vi&q=' + encodeURIComponent(query);
+    const res = await fetch(url);
+    if (!res.ok) throw new Error('Nominatim HTTP ' + res.status);
+    const arr = await res.json();
+    if (!arr.length) return null;
+    return { lat: parseFloat(arr[0].lat), lon: parseFloat(arr[0].lon), label: arr[0].display_name };
+  }
+
+  function getPosition() {
+    return new Promise((resolve, reject) => {
+      if (!navigator.geolocation) return reject(new Error('Trình duyệt không hỗ trợ định vị'));
+      navigator.geolocation.getCurrentPosition(
+        p => resolve({ lat: p.coords.latitude, lon: p.coords.longitude }),
+        e => reject(new Error(e.message || 'Không lấy được vị trí')),
+        { enableHighAccuracy: true, timeout: 12000 });
+    });
+  }
+
+  const api = { MAX_RADIUS_M, haversineKm, buildQuery, normalize, findNearby, geocode, getPosition };
+  if (typeof module !== 'undefined' && module.exports) module.exports = api;
+  else root.Geo = api;
+})(typeof window !== 'undefined' ? window : globalThis);
+</script>
+<script>
+/* ===== src/app.js ===== */
+(function () {
+  const K = window.Knowledge, E = window.Engine, G = window.Geo;
+  const $ = id => document.getElementById(id);
+  const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
+  let center = null, map = null, layer = null, places = [], filter = 'all', preferred = ['pharmacy', 'clinic', 'hospital'];
+
+  // ---- Dựng form ----
+  $('rfList').innerHTML = K.RED_FLAGS.map(r => `<label class="check"><input type="checkbox" name="rf" value="${r.id}"> ${esc(r.label)}</label>`).join('');
+  const groups = {};
+  K.SYMPTOMS.forEach(s => (groups[s.group] ||= []).push(s));
+  $('symptomList').innerHTML = Object.entries(groups).map(([g, list]) =>
+    `<fieldset><legend>${esc(g)}</legend><div class="checks">` +
+    list.map(s => `<label class="check"><input type="checkbox" name="sym" value="${s.id}"> ${esc(s.label)}</label>`).join('') +
+    `</div></fieldset>`).join('');
+
+  const checked = name => [...document.querySelectorAll(`input[name=${name}]:checked`)].map(i => i.value);
+
+  // ---- Vị trí ----
+  function setCenter(c, label) {
+    center = c;
+    $('locStatus').textContent = '✅ Đã xác định vị trí' + (label ? ': ' + label : ` (${c.lat.toFixed(4)}, ${c.lon.toFixed(4)})`);
+  }
+  $('btnLocate').onclick = async () => {
+    $('locStatus').textContent = 'Đang lấy vị trí…';
+    try { setCenter(await G.getPosition()); }
+    catch (e) { $('locStatus').textContent = '❌ ' + e.message + '. Hãy nhập địa chỉ thủ công.'; }
+  };
+  $('address').addEventListener('input', () => { center = null; });
+  $('btnGeocode').onclick = async () => {
+    const q = $('address').value.trim();
+    if (!q) return;
+    $('locStatus').textContent = 'Đang tìm địa chỉ…';
+    try {
+      const r = await G.geocode(q);
+      if (r) setCenter(r, r.label); else $('locStatus').textContent = '❌ Không tìm thấy địa chỉ.';
+    } catch (e) { $('locStatus').textContent = '❌ Lỗi tìm địa chỉ: ' + e.message; }
+  };
+
+  function ageFromDob(v) {
+    if (!v) return '';
+    const d = new Date(v), n = new Date();
+    if (isNaN(d) || d > n) return '';
+    let age = n.getFullYear() - d.getFullYear();
+    if (n.getMonth() < d.getMonth() || (n.getMonth() === d.getMonth() && n.getDate() < d.getDate())) age--;
+    return age;
+  }
+
+  // ---- Phân tích ----
+  $('form').addEventListener('submit', async ev => {
+    ev.preventDefault();
+    const profile = {
+      name: $('fullname').value.trim(), age: ageFromDob($('dob').value), temperature: $('temperature').value,
+      fever_days: $('fever_days').value, allergies: $('allergies').value, pregnant: $('pregnant').checked,
+    };
+    const symptoms = checked('sym'), redFlags = checked('rf');
+    if (!symptoms.length && !redFlags.length) { alert('Vui lòng chọn ít nhất một triệu chứng.'); return; }
+    if ($('dob').value && profile.age === '') { alert('Ngày sinh không hợp lệ.'); return; }
+    if (!center && $('address').value.trim()) {
+      try { const r = await G.geocode($('address').value.trim()); if (r) setCenter(r, r.label); } catch (e) { /* bỏ qua, báo ở bước tìm nơi */ }
+    }
+    const res = E.analyze({ symptoms, profile, redFlags });
+    res.userName = profile.name; res.userAge = profile.age;
+    renderResult(res);
+    $('results').hidden = false;
+    $('results').scrollIntoView({ behavior: 'smooth' });
+
+    const first = res.conditions[0];
+    preferred = first ? first.facility : ['pharmacy', 'clinic', 'hospital'];
+    if (res.emergency) preferred = ['hospital'];
+    if (!center) { $('placesStatus').textContent = 'Hãy nhập nơi ở hoặc dùng GPS ở bước 1 rồi bấm phân tích lại để xem nơi gần bạn.'; return; }
+    await loadPlaces();
+  });
+
+  function renderResult(res) {
+    $('resultTitle').textContent = res.userName ? `Kết quả phân tích cho ${res.userName}${res.userAge !== '' ? ' (' + res.userAge + ' tuổi)' : ''}` : 'Kết quả phân tích';
+    const em = $('emergency');
+    em.hidden = !res.emergency;
+    if (res.emergency) {
+      em.innerHTML = `<h3>🚨 CẦN CẤP CỨU NGAY – gọi <a href="tel:115">115</a></h3><ul>` +
+        res.redFlags.map(r => `<li>${esc(r.label)}</li>`).join('') +
+        `</ul><p>Đừng tự điều trị tại nhà. Đến bệnh viện gần nhất ngay.</p>`;
+    }
+    $('warnings').innerHTML = res.warnings.map(w => `<div class="alert warn">⚠️ ${esc(w)}</div>`).join('');
+    $('conditions').innerHTML = res.conditions.length ? res.conditions.map((c, i) => `
+      <article class="card cond">
+        <div class="cond-head">
+          <h3>${i + 1}. ${esc(c.name)}</h3>
+          <span class="badge ${c.level.replace(' ', '-')}">Khả năng ${esc(c.level)} · ${c.likelihood}%</span>
+        </div>
+        <div class="bar"><i style="width:${c.likelihood}%"></i></div>
+        <p>${esc(c.summary)}</p>
+        <p class="muted">Triệu chứng khớp: ${c.matched.map(esc).join(', ')}</p>
+        <p><strong>Chuyên khoa nên khám:</strong> ${esc(c.specialty)}</p>
+        <h4>💊 Nhóm thuốc thường dùng (hỏi dược sĩ/bác sĩ trước khi dùng)</h4>
+        <ul>${c.drugs.map(d => `<li><strong>${esc(d.group)}</strong> – ${esc(d.examples)}<br><small>${esc(d.note)}</small></li>`).join('')}</ul>
+        ${c.avoidDrugs.length ? `<p class="avoid">🚫 Không nên dùng cho bạn: ${c.avoidDrugs.map(esc).join('; ')}</p>` : ''}
+        <h4>📝 Lời khuyên</h4>
+        <ul>${c.advice.map(a => `<li>${esc(a)}</li>`).join('')}</ul>
+      </article>`).join('')
+      : (res.emergency ? '' : '<p class="card">Không đủ thông tin để gợi ý. Hãy chọn thêm triệu chứng hoặc đến gặp bác sĩ.</p>');
+  }
+
+  // ---- Bản đồ & danh sách ----
+  async function loadPlaces() {
+    $('placesStatus').textContent = 'Đang tìm cơ sở y tế quanh bạn…';
+    $('places').innerHTML = '';
+    try {
+      places = await G.findNearby(center, 10);
+      $('placesStatus').textContent = places.length ? `Tìm thấy ${places.length} địa điểm trong 10 km.` : 'Không tìm thấy địa điểm nào trong 10 km (dữ liệu OpenStreetMap có thể chưa đầy đủ).';
+      renderPlaces();
+    } catch (e) {
+      $('placesStatus').textContent = '❌ Không tải được dữ liệu bản đồ: ' + e.message + '. Vui lòng thử lại.';
+    }
+  }
+
+  function renderPlaces() {
+    const list = places.filter(p => filter === 'all' || p.kind === filter);
+    // Ưu tiên loại phù hợp với chẩn đoán khi xem "Tất cả"
+    const rank = p => { const i = preferred.indexOf(p.kind); return i < 0 ? 99 : i; };
+    const shown = filter === 'all' ? [...list].sort((a, b) => (rank(a) - rank(b)) || (a.distanceKm - b.distanceKm)) : list;
+    $('places').innerHTML = shown.slice(0, 60).map(p => {
+      const dir = `https://www.google.com/maps/dir/?api=1&origin=${center.lat},${center.lon}&destination=${p.lat},${p.lon}`;
+      return `<li class="place ${p.kind}">
+        <div><strong>${esc(p.name)}</strong> <span class="tag">${esc(p.label)}</span></div>
+        <div class="muted">${p.distanceKm.toFixed(1)} km${p.address ? ' · ' + esc(p.address) : ''}</div>
+        ${p.hours ? `<div class="muted">🕒 ${esc(p.hours)}</div>` : ''}
+        <div class="links">${p.phone ? `<a href="tel:${esc(p.phone.replace(/[^+\d]/g, ''))}">📞 ${esc(p.phone)}</a>` : ''}<a href="${dir}" target="_blank" rel="noopener">🧭 Chỉ đường</a></div>
+      </li>`;
+    }).join('');
+    drawMap(shown.slice(0, 60));
+  }
+
+  function drawMap(list) {
+    if (typeof L === 'undefined') { $('map').hidden = true; return; }
+    if (!map) {
+      map = L.map('map');
+      L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '© OpenStreetMap' }).addTo(map);
+    }
+    if (layer) layer.remove();
+    layer = L.layerGroup().addTo(map);
+    L.circle([center.lat, center.lon], { radius: 10000, color: '#0b7a75', weight: 1, fillOpacity: 0.04 }).addTo(layer);
+    L.marker([center.lat, center.lon]).addTo(layer).bindPopup('Vị trí của bạn');
+    const colors = { pharmacy: '#2e9e4f', clinic: '#e08a00', hospital: '#d33' };
+    list.forEach(p => L.circleMarker([p.lat, p.lon], { radius: 7, color: colors[p.kind] || '#555', fillOpacity: 0.85 })
+      .addTo(layer).bindPopup(`<strong>${esc(p.name)}</strong><br>${esc(p.label)} · ${p.distanceKm.toFixed(1)} km`));
+    map.fitBounds(L.latLng(center.lat, center.lon).toBounds(20000));
+    setTimeout(() => map.invalidateSize(), 50);
+  }
+
+  $('filters').addEventListener('click', e => {
+    const b = e.target.closest('button[data-f]');
+    if (!b) return;
+    filter = b.dataset.f;
+    document.querySelectorAll('#filters .chip').forEach(c => c.classList.toggle('active', c === b));
+    if (center && places.length) renderPlaces();
+  });
+})();
+</script>
+</body>
+</html>
